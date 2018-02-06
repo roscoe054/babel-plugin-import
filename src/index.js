@@ -13,13 +13,13 @@ module.exports = function ({ types }) {
                     const styleIdentifierName = '__yis_style_' + compName;
                     // replace *** import { Page } from '@qnpm/yis/components' *** with below
                     path.replaceWithMultiple([
-                        // const Page = _yComponents.Page
+                        // const Page = YISComponents.Page
                         types.variableDeclaration('const',
                             [
                                 types.variableDeclarator({
                                     type: "Identifier",
                                     name: compName
-                                }, types.identifier("_yComponents." + compName))
+                                }, types.identifier("YISComponents." + compName))
                             ]
                         ),
                         // import __yis_style_Page = @qnpm/yis/components/page/page.css
