@@ -1,91 +1,41 @@
-import assert from 'assert';
-import Plugin from './Plugin';
+module.exports = function ({ types }) {
+    const ret = {
+        visitor: {
+            ImportDeclaration(path) {
+                const { node } = path;
+                if (!node) return;
 
-export default function ({ types }) {
-  let plugins = null;
+                const libraryName = '@qnpm/yis/components';
+                if (node.source.value === libraryName) {
+                    const compName = node.specifiers[0].local.name;
+                    const compNameInLowerCase = compName.toLowerCase();
 
-  // Only for test
-  global.__clearBabelAntdPlugin = () => {
-    plugins = null;
-  };
-
-  function applyInstance(method, args, context) {
-    for (const plugin of plugins) {
-      if (plugin[method]) {
-        plugin[method].apply(plugin, [...args, context]);
-      }
+                    const styleIdentifierName = '__yis_style_' + compName;
+                    // replace *** import { Page } from '@qnpm/yis/components' *** with below
+                    path.replaceWithMultiple([
+                        // const Page = _yComponents.Page
+                        types.variableDeclaration('const',
+                            [
+                                types.variableDeclarator({
+                                    type: "Identifier",
+                                    name: compName
+                                }, types.identifier("_yComponents." + compName))
+                            ]
+                        ),
+                        // import __yis_style_Page = @qnpm/yis/components/page/page.css
+                        types.importDeclaration([
+                            types.importSpecifier(
+                                types.identifier(styleIdentifierName),
+                                types.identifier(styleIdentifierName)
+                            )
+                        ], types.stringLiteral(
+                            `@qnpm/yis/components/${compNameInLowerCase}/${compNameInLowerCase}.css`
+                        ))
+                    ]);
+                }
+            }
+        }
     }
-  }
 
-  function Program(path, { opts = {} }) {
-    // Init plugin instances once.
-    if (!plugins) {
-      if (Array.isArray(opts)) {
-        plugins = opts.map(({
-          libraryName,
-          libraryDirectory,
-          style,
-          camel2DashComponentName,
-          camel2UnderlineComponentName,
-          fileName,
-          customName,
-        }) => {
-          assert(libraryName, 'libraryName should be provided');
-          return new Plugin(
-            libraryName,
-            libraryDirectory,
-            style,
-            camel2DashComponentName,
-            camel2UnderlineComponentName,
-            fileName,
-            customName,
-            types
-          );
-        });
-      } else {
-        assert(opts.libraryName, 'libraryName should be provided');
-        plugins = [
-          new Plugin(
-            opts.libraryName,
-            opts.libraryDirectory,
-            opts.style,
-            opts.camel2DashComponentName,
-            opts.camel2UnderlineComponentName,
-            opts.fileName,
-            opts.customName,
-            types
-          ),
-        ];
-      }
-    }
-    applyInstance('Program', arguments, this);  // eslint-disable-line
-  }
-
-  const methods = [
-    'ImportDeclaration',
-    'CallExpression',
-    'MemberExpression',
-    'Property',
-    'VariableDeclarator',
-    'LogicalExpression',
-    'ConditionalExpression',
-    'IfStatement',
-    'ExpressionStatement',
-    'ReturnStatement',
-    'ExportDefaultDeclaration',
-    'BinaryExpression',
-    'NewExpression',
-  ];
-
-  const ret = {
-    visitor: { Program },
-  };
-
-  for (const method of methods) {
-    ret.visitor[method] = function () { // eslint-disable-line
-      applyInstance(method, arguments, ret.visitor);  // eslint-disable-line
-    };
-  }
-
-  return ret;
+    return ret;
 }
